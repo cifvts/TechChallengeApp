@@ -83,6 +83,9 @@ func NewRdsStack(scope constructs.Construct, id string, props *RdsStackProps) aw
 			EncryptionKey: kmsPostgresKey,
 			SecretName: jsii.String("Postgresql pgadmin"),
 		}),
+		Port: jsii.Number(5432),
+		StorageEncrypted: jsii.Bool(true),
+		StorageEncryptionKey: kmsPostgresKey,
 		InstanceProps: &awsrds.InstanceProps{
 			InstanceType: awsec2.InstanceType_Of(awsec2.InstanceClass_T4G, awsec2.InstanceSize_MICRO),
 			VpcSubnets: &awsec2.SubnetSelection{
