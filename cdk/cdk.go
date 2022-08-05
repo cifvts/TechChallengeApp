@@ -9,6 +9,11 @@ import (
 	"github.com/aws/jsii-runtime-go"
 )
 
+type VpcStack struct {
+	Stack awscdk.Stack
+	Vpc awsec2.IVpc
+}
+
 type VpcStackProps struct {
 	awscdk.StackProps
 }
@@ -18,7 +23,7 @@ type RdsStackProps struct {
 	vpc awsec2.IVpc
 }
 
-func VpcStack(scope constructs.Construct, id string, props *VpcStackProps) (awscdk.Stack, awsec2.IVpc) {
+func NewVpcStack(scope constructs.Construct, id string, props *VpcStackProps) VpcStack {
 	var sprops awscdk.StackProps
 	if props != nil {
 		sprops = props.StackProps
@@ -47,10 +52,10 @@ func VpcStack(scope constructs.Construct, id string, props *VpcStackProps) (awsc
 		},
 	})
 
-	return stack, vpc
+	return VpcStack{stack, vpc}
 }
 
-func RdsStack(scope constructs.Construct, id string, props *RdsStackProps) awscdk.Stack {
+func NewRdsStack(scope constructs.Construct, id string, props *RdsStackProps) awscdk.Stack {
 	var sprops awscdk.StackProps
 	if props != nil {
 		sprops = props.StackProps
@@ -84,17 +89,17 @@ func RdsStack(scope constructs.Construct, id string, props *RdsStackProps) awscd
 func main() {
 	app := awscdk.NewApp(nil)
 
-	_, vpc := VpcStack(app, "VpcStack", &VpcStackProps{
+	vpcStack := NewVpcStack(app, "VpcStack", &VpcStackProps{
 		awscdk.StackProps{
 			Env: env(),
 		},
 	})
 
-	RdsStack(app, "RdsStack", &RdsStackProps{
+	NewRdsStack(app, "RdsStack", &RdsStackProps{
 		awscdk.StackProps{
 			Env: env(),
 		},
-		vpc,
+		vpcStack.Vpc,
 	})
 
 	app.Synth(nil)
