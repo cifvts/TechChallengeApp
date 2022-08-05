@@ -2,6 +2,8 @@ package main
 
 import (
 	"github.com/aws/aws-cdk-go/awscdk/v2"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsautoscaling"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsecs"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awskms"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsrds"
@@ -16,6 +18,11 @@ type VpcStack struct {
 
 type VpcStackProps struct {
 	awscdk.StackProps
+}
+
+type EcsStackProps struct {
+	awscdk.StackProps
+	vpc awsec2.IVpc
 }
 
 type RdsStackProps struct {
@@ -62,7 +69,7 @@ func NewRdsStack(scope constructs.Construct, id string, props *RdsStackProps) aw
 	}
 	stack := awscdk.NewStack(scope, &id, &sprops)
 
-	kmsKey := awskms.NewKey(stack, jsii.String("PostgresKey"), &awskms.KeyProps{
+	kmsPostgresKey := awskms.NewKey(stack, jsii.String("PostgresKey"), &awskms.KeyProps{
 		EnableKeyRotation: jsii.Bool(true),
 	})
 
@@ -71,7 +78,7 @@ func NewRdsStack(scope constructs.Construct, id string, props *RdsStackProps) aw
 			Version: awsrds.AuroraPostgresEngineVersion_VER_10_7(),
 		}),
 		Credentials: awsrds.Credentials_FromGeneratedSecret(jsii.String("pgadmin"), &awsrds.CredentialsBaseOptions{
-			EncryptionKey: kmsKey,
+			EncryptionKey: kmsPostgresKey,
 			SecretName: jsii.String("Postgresql pgadmin"),
 		}),
 		InstanceProps: &awsrds.InstanceProps{
@@ -86,6 +93,56 @@ func NewRdsStack(scope constructs.Construct, id string, props *RdsStackProps) aw
 	return stack
 }
 
+func NewEcsStack(scope constructs.Construct, id string, props *EcsStackProps) awscdk.Stack {
+	var sprops awscdk.StackProps
+	if props != nil {
+		sprops = props.StackProps
+	}
+	stack := awscdk.NewStack(scope, &id, &sprops)
+
+	kmsEcsExecLogKey := awskms.NewKey(stack, jsii.String("EcsExecLogKey"), &awskms.KeyProps{
+		EnableKeyRotation: jsii.Bool(true),
+	})
+
+	ecsExecLogGroup := awslogs.NewLogGroup(stack, jsii.String("EcsExecLogGroup"), &awslogs.LogGroupProps{
+		EncryptionKey: kmsEcsExecLogKey,
+	})
+
+	ecsExecLogBucket := awss3.NewBucket(stack, jsii.String("EcsExecLogBucket"), &awss3.BucketProps{
+		EncryptionKey: kmsEcsExecLogKey,
+	})
+
+	asg := awsautoscaling.NewAutoScalingGroup(stack, jsii.String("ECSChallengeASG"), &awsautoscaling.AutoScalingGroupProps{
+		InstanceType: awsec2.NewInstanceType(jsii.String("t3a.micro")),
+		MachineImage: awsecs.EcsOptimizedImage_AmazonLinux2(awsecs.AmiHardwareType_STANDARD, &awsecs.EcsOptimizedImageOptions{}),
+		DesiredCapacity: jsii.Number(1),
+		Vpc: props.vpc,
+	});
+
+	cluster := awsecs.NewCluster(stack, jsii.String("ECSCluster"), &awsecs.ClusterProps{
+		Vpc: props.vpc,
+		ExecuteCommandConfiguration: &awsecs.ExecuteCommandConfiguration{
+			KmsKey: kmsEcsExecLogKey,
+			LogConfiguration: &awsecs.ExecuteCommandLogConfiguration{
+				CloudWatchLogGroup: ecsExecLogGroup,
+				CloudWatchEncryptionEnabled: jsii.Bool(true),
+				S3Bucket: ecsExecLogBucket,
+				S3EncryptionEnabled: jsii.Bool(true),
+				S3KeyPrefix: jsii.String("exec-command-output"),
+			},
+			Logging: awsecs.ExecuteCommandLogging_OVERRIDE,
+		},
+	});
+
+	capacity_provider := awsecs.NewAsgCapacityProvider(stack, jsii.String("AsgCapacityProvider"), &awsecs.AsgCapacityProviderProps{
+		AutoScalingGroup: asg,
+	});
+
+	cluster.AddAsgCapacityProvider(capacity_provider, &awsecs.AddAutoScalingGroupCapacityOptions{})
+
+	return stack
+}
+
 func main() {
 	app := awscdk.NewApp(nil)
 
@@ -96,6 +153,13 @@ func main() {
 	})
 
 	NewRdsStack(app, "RdsStack", &RdsStackProps{
+		awscdk.StackProps{
+			Env: env(),
+		},
+		vpcStack.Vpc,
+	})
+
+	NewEcsStack(app, "EcsStack", &EcsStackProps{
 		awscdk.StackProps{
 			Env: env(),
 		},
