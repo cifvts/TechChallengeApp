@@ -10,8 +10,13 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslogs"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsrds"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awss3"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awssecretsmanager"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
+)
+
+const (
+	rdsSecret string = "pgadmin"
 )
 
 type VpcStack struct {
@@ -90,7 +95,7 @@ func NewRdsStack(scope constructs.Construct, id string, props *RdsStackProps) aw
 		Engine: awsrds.DatabaseClusterEngine_AuroraPostgres(&awsrds.AuroraPostgresClusterEngineProps{
 			Version: awsrds.AuroraPostgresEngineVersion_VER_10_7(),
 		}),
-		Credentials: awsrds.Credentials_FromGeneratedSecret(jsii.String("pgadmin"), &awsrds.CredentialsBaseOptions{
+		Credentials: awsrds.Credentials_FromGeneratedSecret(jsii.String(rdsSecret), &awsrds.CredentialsBaseOptions{
 			EncryptionKey: kmsPostgresKey,
 			SecretName: jsii.String("Postgresql pgadmin"),
 		}),
@@ -166,11 +171,19 @@ func NewApplicationStack(scope constructs.Construct, id string, props *Applicati
 	}
 	stack := awscdk.NewStack(scope, &id, &sprops)
 
+	rdsSecret := awssecretsmanager.Secret_FromSecretNameV2(stack, jsii.String("rdsSecret"), jsii.String(rdsSecret))
+
 	awsecspatterns.NewApplicationLoadBalancedEc2Service(stack, jsii.String("Service"), &awsecspatterns.ApplicationLoadBalancedEc2ServiceProps{
 		Cluster: props.Cluster,
 		MemoryLimitMiB: jsii.Number(1024),
 		TaskImageOptions: &awsecspatterns.ApplicationLoadBalancedTaskImageOptions{
 			Image: awsecs.ContainerImage_FromRegistry(jsii.String("servian/techchallengeapp"), &awsecs.RepositoryImageProps{}),
+			Secrets: &map[string]awsecs.Secret{
+				"VTT_DBUSER": awsecs.Secret_FromSecretsManager(rdsSecret, jsii.String("username")),
+				"VTT_DBPASSWORD": awsecs.Secret_FromSecretsManager(rdsSecret, jsii.String("password")),
+				"VTT_DBHOST": awsecs.Secret_FromSecretsManager(rdsSecret, jsii.String("host")),
+				"VTT_DBPORT": awsecs.Secret_FromSecretsManager(rdsSecret, jsii.String("port")),
+			},
 		},
 		DesiredCount: jsii.Number(1),
 		CircuitBreaker: &awsecs.DeploymentCircuitBreaker{
