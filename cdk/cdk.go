@@ -5,6 +5,7 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsautoscaling"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecs"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awsecspatterns"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awskms"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslogs"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsrds"
@@ -22,14 +23,24 @@ type VpcStackProps struct {
 	awscdk.StackProps
 }
 
+type EcsStack struct {
+	Stack awscdk.Stack
+	Cluster awsecs.ICluster
+}
+
 type EcsStackProps struct {
 	awscdk.StackProps
-	vpc awsec2.IVpc
+	Vpc awsec2.IVpc
 }
 
 type RdsStackProps struct {
 	awscdk.StackProps
-	vpc awsec2.IVpc
+	Vpc awsec2.IVpc
+}
+
+type ApplicationStackProps struct {
+	awscdk.StackProps
+	Cluster awsecs.ICluster
 }
 
 func NewVpcStack(scope constructs.Construct, id string, props *VpcStackProps) VpcStack {
@@ -91,14 +102,14 @@ func NewRdsStack(scope constructs.Construct, id string, props *RdsStackProps) aw
 			VpcSubnets: &awsec2.SubnetSelection{
 				SubnetType: awsec2.SubnetType_PRIVATE_ISOLATED,
 			},
-			Vpc: props.vpc,
+			Vpc: props.Vpc,
 		},
 	})
 
 	return stack
 }
 
-func NewEcsStack(scope constructs.Construct, id string, props *EcsStackProps) awscdk.Stack {
+func NewEcsStack(scope constructs.Construct, id string, props *EcsStackProps) EcsStack {
 	var sprops awscdk.StackProps
 	if props != nil {
 		sprops = props.StackProps
@@ -121,11 +132,11 @@ func NewEcsStack(scope constructs.Construct, id string, props *EcsStackProps) aw
 		InstanceType: awsec2.NewInstanceType(jsii.String("t3a.micro")),
 		MachineImage: awsecs.EcsOptimizedImage_AmazonLinux2(awsecs.AmiHardwareType_STANDARD, &awsecs.EcsOptimizedImageOptions{}),
 		DesiredCapacity: jsii.Number(1),
-		Vpc: props.vpc,
+		Vpc: props.Vpc,
 	});
 
 	cluster := awsecs.NewCluster(stack, jsii.String("ECSCluster"), &awsecs.ClusterProps{
-		Vpc: props.vpc,
+		Vpc: props.Vpc,
 		ExecuteCommandConfiguration: &awsecs.ExecuteCommandConfiguration{
 			KmsKey: kmsEcsExecLogKey,
 			LogConfiguration: &awsecs.ExecuteCommandLogConfiguration{
@@ -144,6 +155,29 @@ func NewEcsStack(scope constructs.Construct, id string, props *EcsStackProps) aw
 	});
 
 	cluster.AddAsgCapacityProvider(capacity_provider, &awsecs.AddAutoScalingGroupCapacityOptions{})
+
+	return EcsStack{stack, cluster}
+}
+
+func NewApplicationStack(scope constructs.Construct, id string, props *ApplicationStackProps) awscdk.Stack {
+	var sprops awscdk.StackProps
+	if props != nil {
+		sprops = props.StackProps
+	}
+	stack := awscdk.NewStack(scope, &id, &sprops)
+
+	awsecspatterns.NewApplicationLoadBalancedEc2Service(stack, jsii.String("Service"), &awsecspatterns.ApplicationLoadBalancedEc2ServiceProps{
+		Cluster: props.Cluster,
+		MemoryLimitMiB: jsii.Number(1024),
+		TaskImageOptions: &awsecspatterns.ApplicationLoadBalancedTaskImageOptions{
+			Image: awsecs.ContainerImage_FromRegistry(jsii.String("servian/techchallengeapp"), &awsecs.RepositoryImageProps{}),
+		},
+		DesiredCount: jsii.Number(1),
+		CircuitBreaker: &awsecs.DeploymentCircuitBreaker{
+			Rollback: jsii.Bool(true),
+		},
+		ListenerPort: jsii.Number(80),
+	})
 
 	return stack
 }
@@ -164,11 +198,18 @@ func main() {
 		vpcStack.Vpc,
 	})
 
-	NewEcsStack(app, "EcsStack", &EcsStackProps{
+	ecsStack := NewEcsStack(app, "EcsStack", &EcsStackProps{
 		awscdk.StackProps{
 			Env: env(),
 		},
 		vpcStack.Vpc,
+	})
+
+	NewApplicationStack(app, "ApplicationStack", &ApplicationStackProps{
+		awscdk.StackProps{
+			Env: env(),
+		},
+		ecsStack.Cluster,
 	})
 
 	app.Synth(nil)
