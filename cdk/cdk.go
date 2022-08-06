@@ -52,7 +52,7 @@ func NewVpcStack(scope constructs.Construct, id string, props *VpcStackProps) Vp
 
 	vpc := awsec2.NewVpc(stack, jsii.String("VPC"), &awsec2.VpcProps{
 		Cidr: jsii.String("10.0.0.0/21"),
-		MaxAzs: jsii.Number(3),
+		MaxAzs: jsii.Number(2),
 		SubnetConfiguration: &[]*awsec2.SubnetConfiguration{
 			&awsec2.SubnetConfiguration{
 				SubnetType: awsec2.SubnetType_PUBLIC,
@@ -67,7 +67,7 @@ func NewVpcStack(scope constructs.Construct, id string, props *VpcStackProps) Vp
 			&awsec2.SubnetConfiguration{
 				SubnetType: awsec2.SubnetType_PRIVATE_ISOLATED,
 				Name: jsii.String("Data"),
-				CidrMask: jsii.Number(24),
+				CidrMask: jsii.Number(27),
 			},
 		},
 	})
@@ -131,7 +131,7 @@ func NewEcsStack(scope constructs.Construct, id string, props *EcsStackProps) Ec
 	asg := awsautoscaling.NewAutoScalingGroup(stack, jsii.String("ECSChallengeASG"), &awsautoscaling.AutoScalingGroupProps{
 		InstanceType: awsec2.NewInstanceType(jsii.String("t3a.micro")),
 		MachineImage: awsecs.EcsOptimizedImage_AmazonLinux2(awsecs.AmiHardwareType_STANDARD, &awsecs.EcsOptimizedImageOptions{}),
-		DesiredCapacity: jsii.Number(1),
+		DesiredCapacity: jsii.Number(2),
 		Vpc: props.Vpc,
 	});
 
