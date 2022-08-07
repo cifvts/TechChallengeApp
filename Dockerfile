@@ -31,4 +31,7 @@ WORKDIR /TechChallengeApp
 COPY conf.toml ./conf.toml
 COPY --from=build /TechChallengeApp TechChallengeApp
 
-ENTRYPOINT [ "./TechChallengeApp" ]
+ADD /entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT [ "./entrypoint.sh" ]
