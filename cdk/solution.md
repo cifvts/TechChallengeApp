@@ -158,3 +158,19 @@ parameters to the lambda, this could be used for multiple stacks/applications.
 The lambda, once executed, should check if a secret already exists. In that case, it means it has
 already created the user (unless it can be called to replace the password). Otherwise, it can create
 a password, create the user in the database, and save it as a secret.
+
+### Application HealtchCheck
+
+The code to create a custom health check for the application results in this template:
+
+```
+Type: AWS::ElasticLoadBalancingV2::TargetGroup
+Properties:
+  HealthCheckPath: /healthcheck/
+  HealthCheckPort: "3000"
+  Port: 80
+  Protocol: HTTP
+```
+
+This would require some investigation to make sure we obtain the correct behaviour or there
+is a problem in the Goland CDK that cause that output.
