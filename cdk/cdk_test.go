@@ -84,8 +84,16 @@ func TestStacks(t *testing.T) {
 	applicationTemplate.ResourceCountIs(jsii.String("AWS::ElasticLoadBalancingV2::LoadBalancer"), jsii.Number(1))
 
 	applicationTemplate.ResourceCountIs(jsii.String("AWS::ElasticLoadBalancingV2::Listener"), jsii.Number(1))
+	applicationTemplate.HasResourceProperties(jsii.String("AWS::ElasticLoadBalancingV2::Listener"), map[string]interface{}{
+		"Port": 3000,
+		"Protocol": "HTTP",
+	})
 
 	applicationTemplate.ResourceCountIs(jsii.String("AWS::ElasticLoadBalancingV2::TargetGroup"), jsii.Number(1))
+	applicationTemplate.HasResourceProperties(jsii.String("AWS::ElasticLoadBalancingV2::TargetGroup"), map[string]interface{}{
+		"HealthCheckPath": "/healthcheck/",
+		"HealthCheckPort": "3000",
+	})
 
 	applicationTemplate.ResourceCountIs(jsii.String("AWS::ECS::Service"), jsii.Number(1))
 	applicationTemplate.HasResourceProperties(jsii.String("AWS::ECS::Service"), map[string]interface{}{

@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecs"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsecspatterns"
+	"github.com/aws/aws-cdk-go/awscdk/v2/awselasticloadbalancingv2"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awskms"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awslogs"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsrds"
@@ -173,11 +174,12 @@ func NewApplicationStack(scope constructs.Construct, id string, props *Applicati
 
 	rdsSecret := awssecretsmanager.Secret_FromSecretNameV2(stack, jsii.String("rdsSecret"), jsii.String(rdsSecret))
 
-	awsecspatterns.NewApplicationLoadBalancedEc2Service(stack, jsii.String("Service"), &awsecspatterns.ApplicationLoadBalancedEc2ServiceProps{
+	applicationAlb := awsecspatterns.NewApplicationLoadBalancedEc2Service(stack, jsii.String("Service"), &awsecspatterns.ApplicationLoadBalancedEc2ServiceProps{
 		Cluster: props.Cluster,
 		MemoryLimitMiB: jsii.Number(1024),
 		TaskImageOptions: &awsecspatterns.ApplicationLoadBalancedTaskImageOptions{
 			Image: awsecs.ContainerImage_FromRegistry(jsii.String("servian/techchallengeapp"), &awsecs.RepositoryImageProps{}),
+			ContainerPort: jsii.Number(3000),
 			Secrets: &map[string]awsecs.Secret{
 				"VTT_DBUSER": awsecs.Secret_FromSecretsManager(rdsSecret, jsii.String("username")),
 				"VTT_DBPASSWORD": awsecs.Secret_FromSecretsManager(rdsSecret, jsii.String("password")),
@@ -189,7 +191,15 @@ func NewApplicationStack(scope constructs.Construct, id string, props *Applicati
 		CircuitBreaker: &awsecs.DeploymentCircuitBreaker{
 			Rollback: jsii.Bool(true),
 		},
-		ListenerPort: jsii.Number(80),
+		ListenerPort: jsii.Number(3000),
+		// This is not explicity stated, need to clarify
+		PublicLoadBalancer: jsii.Bool(false),
+		LoadBalancerName: jsii.String("servian-app-alb"),
+	})
+
+	applicationAlb.TargetGroup().ConfigureHealthCheck(&awselasticloadbalancingv2.HealthCheck{
+		Path: jsii.String("/healthcheck/"),
+		Port: jsii.String("3000"),
 	})
 
 	return stack
