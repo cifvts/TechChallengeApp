@@ -123,6 +123,9 @@ cluster. There are possible patterns that can be used to minimize the amount of 
 
 ## Notes
 
+The code has been tested locally and has not been deployed due to the lack of a public cloud
+available for the deployment of the infrastructure.
+
 ### CDK
 
 Given the time constraints, all the stacks have been put into one single file. It might be good
@@ -174,3 +177,17 @@ Properties:
 
 This would require some investigation to make sure we obtain the correct behaviour or there
 is a problem in the Goland CDK that cause that output.
+
+### Database and application updates
+
+The current implementation of the application is not very practical in its management of the
+database. It only allow to drop and rewrite the whole database or just the table. This should be
+changed in a way that will allow more automation without user intervention.
+
+Possible improvements:
+
+* introduce versioning of the database in order to keep track of changes and allow the
+application to make incremental changes;
+* modify the application so it can always try to update the database safely, looking at the
+current version;
+* keep the SQL out of the application; it will be easier to update and maintain.
